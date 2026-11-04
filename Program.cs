@@ -15,12 +15,34 @@ class Program
             // Common browser caches
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Google\Chrome\User Data\Default\Cache"),
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Microsoft\Edge\User Data\Default\Cache"),
+            // Windows caches (Temporary Internet Files, WER, DirectX Shader Cache)
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Microsoft\Windows\INetCache"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Microsoft\Windows\WER"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Microsoft\Windows\D3DSCache"),
         };
 
         foreach (var d in dirs)
         {
             if (string.IsNullOrWhiteSpace(d) || !Directory.Exists(d)) continue;
             CleanDirectory(d, 0);
+        }
+
+        // Thumbnail cache: delete the thumbcache_*.db files only, never the Explorer folder,
+        // and never unlock (unlocking would kill explorer.exe).
+        CleanFiles(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Microsoft\Windows\Explorer"), "thumbcache_*.db", allowUnlock: false);
+
+        // Delivery Optimization cache (elevated, best effort)
+        try { Run("powershell", "-NoProfile -Command \"Delete-DeliveryOptimizationCache -Force\""); } catch { }
+
+        // Admin-required cache contents (root folders are kept; Windows recreates them)
+        var protectedContentDirs = new[]
+        {
+            @"C:\ProgramData\Microsoft\Windows\WER",
+            @"C:\Windows\ServiceProfiles\NetworkService\AppData\Local\Microsoft\Windows\DeliveryOptimization\Cache",
+        };
+        foreach (var d in protectedContentDirs)
+        {
+            if (Directory.Exists(d)) CleanDirectory(d, 0);
         }
 
         // Admin-required cleanup targets (executed when elevated via scheduled task)
@@ -38,6 +60,25 @@ class Program
 
         // DNS cache flush (best effort)
         try { Run("ipconfig", "/flushdns"); } catch { }
+    }
+
+    static void CleanFiles(string dir, string pattern, bool allowUnlock)
+    {
+        if (!Directory.Exists(dir)) return;
+        try
+        {
+            foreach (var file in Directory.EnumerateFiles(dir, pattern, SearchOption.TopDirectoryOnly))
+            {
+                try { File.Delete(file); }
+                catch
+                {
+                    if (!allowUnlock) continue;
+                    TryUnlock(file);
+                    try { File.Delete(file); } catch { }
+                }
+            }
+        }
+        catch { }
     }
 
     static void CleanDirectory(string path, int depth)

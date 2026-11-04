@@ -13,6 +13,9 @@ StartupCleaner is a Windows startup cleaner written in .NET. On every login it r
 
 - Cleans `%TEMP%`, `%TMP%`, `C:\Windows\Temp`, and local user temp folders
 - Cleans Chrome and Edge cache folders
+- Cleans Temporary Internet Files (`INetCache`), user `WER` crash reports, and the DirectX Shader Cache (`D3DSCache`)
+- Deletes `thumbcache_*.db` (Explorer folder contents are otherwise untouched)
+- Clears the Delivery Optimization cache via `Delete-DeliveryOptimizationCache -Force` and clears `C:\ProgramData\Microsoft\Windows\WER` contents when elevated
 - Uses PowerToys File Locksmith CLI to unlock locked files before retrying deletion
 - Requests administrator privileges for protected cleanup
 - Cleans protected targets such as:
